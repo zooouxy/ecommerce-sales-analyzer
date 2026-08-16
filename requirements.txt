@@ -1,0 +1,11 @@
+pandas
+numpy
+matplotlib
+seaborn
+jupyter
+streamlit
+sqlalchemy
+python-dotenv
+langchain
+openai
+chromadb
