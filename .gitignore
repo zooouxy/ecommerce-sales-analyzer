@@ -6,4 +6,9 @@ __pycache__/
 
 .env
 
-data/raw/
+# Ignore raw data files
+data/raw/*.csv
+data/raw/*.xlsx
+
+# Keep raw data directory
+!data/raw/.gitkeep
