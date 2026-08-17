@@ -12,3 +12,6 @@ data/raw/*.xlsx
 
 # Keep raw data directory
 !data/raw/.gitkeep
+
+# processed data
+data/processed/*.csv
