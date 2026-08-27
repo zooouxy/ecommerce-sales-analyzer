@@ -1,7 +1,9 @@
 .venv/
 
 __pycache__/
+*.pyc
 
+.idea/
 .ipynb_checkpoints/
 
 .env
@@ -13,5 +15,10 @@ data/raw/*.xlsx
 # Keep raw data directory
 !data/raw/.gitkeep
 
-# processed data
+# Processed data
 data/processed/*.csv
+
+# Generated SQLite database
+database/*.db
+
+tools/sqlite/

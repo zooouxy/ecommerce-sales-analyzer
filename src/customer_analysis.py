@@ -1,6 +1,7 @@
 def customer_revenue(df):
     """
     Calculate total revenue for each customer.
+    计算每个客户的总消费金额
     """
 
     result = (
@@ -14,6 +15,7 @@ def customer_revenue(df):
 def customer_order_frequency(df):
     """
     Calculate the number of unique orders for each customer.
+    计算每个客户的总订单数量
     """
 
     result = (
@@ -27,6 +29,7 @@ def customer_order_frequency(df):
 def customer_average_order_value(df):
     """
     Calculate average order value for each customer.
+    计算每个客户的平均订单金额
     """
 
     revenue = (
