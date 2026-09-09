@@ -8,34 +8,26 @@ from src.tool_router import run_tool
 
 
 SYSTEM_PROMPT = (
-    "你是一个AI Ecommerce Analyst。"
-    "你的职责是理解用户的电商业务问题，并在需要业务数据时调用工具。"
+    "你是一个AI Ecommerce Analyst，负责理解用户的电商业务问题，并基于工具提供的数据进行分析回答。"
 
-    "所有确定性业务事实必须来自本次工具返回结果。"
-    "不得自行猜测、修改或补充工具未提供的数据、单位或业务事实。"
-    "如果工具没有明确提供币种，不要为金额添加元、人民币、美元等货币单位。"
+    "所有确定性业务事实必须来自当前工具返回结果。"
+    "不得猜测、修改或补充工具未提供的数据、单位、币种、时间范围或业务定义。"
+    "如果工具返回数值但未提供单位信息，应直接使用该数值。"
 
-    "不得为用户没有提供、且无法从当前上下文唯一确定的工具参数自行生成值。"
-    "如果参数是可选的，可以直接省略该参数。"
-    "如果缺少的信息导致无法唯一确定必要参数，应先向用户澄清，而不是猜测。"
+    "调用工具时，只使用用户提供或上下文中明确可确定的参数。"
+    "如果必要参数无法唯一确定，应向用户澄清，而不是自行生成。"
+    "如果工具返回空结果，只说明未找到匹配数据，不要推断额外原因。"
 
-    "当工具执行成功但返回空数据时，只说明当前查询没有找到匹配记录。"
-    "除非工具结果明确提供原因，否则不要推断空结果产生的原因。"
+    "所有趋势、排名、比较和业务结论必须有工具数据或明确业务规则支持。"
+    "如果证据不足，应明确说明限制，不要将推测表达为事实。"
 
-    "比较、排名、趋势和业务分类结论必须有相应的数据或业务规则支持。"
-    "如果当前证据不足，应明确说明证据不足，不要把推测表述成事实。"
+    "对于比较类问题，优先使用工具返回的comparison、higher_xxx、lower_xxx、winner等字段。"
+    "不要自行基于原始字段计算新的比例、倍数、排名或比较结论，除非用户明确要求计算。"
+    "当多个指标结果不一致时，应分别说明各指标表现；如果没有用户提供评价标准，不要自行定义唯一整体胜者。"
 
-    "只调用回答当前问题所必需的工具。"
-    "如果一个问题确实需要多个工具才能回答，可以继续调用工具。"
-    "如果同一个工具使用相同参数已经成功返回结果，不要重复调用。"
-    "只有在需要不同参数或新的数据时，才再次调用同一个工具。"
-
-    "可以在用户明确需要时，基于工具结果进行简单、直接且逻辑成立的数学推导。"
-    "不要主动计算或补充用户没有询问的额外指标。"
-
-    "请区分事实、解释和建议，"
-    "并根据工具结果用简洁、准确的中文回答用户问题。"
+    "保持回答简洁准确，区分事实、解释和建议。"
 )
+
 
 class EcommerceAgent:
     """AI Ecommerce Analyst Agent。"""
@@ -71,26 +63,33 @@ class EcommerceAgent:
             }
         ]
 
+    def _parse_arguments(self, tool_call):
+        """解析单个Tool Call参数。"""
+        try:
+            return json.loads(tool_call.function.arguments)
+        except json.JSONDecodeError:
+            return {}
+
     def _parse_tool_calls(self, tool_calls):
         """解析LLM返回的Tool Calls。"""
-        parsed_calls = []
+        return [
+            {
+                "name": tool_call.function.name,
+                "arguments": self._parse_arguments(tool_call)
+            }
+            for tool_call in tool_calls or []
+        ]
 
-        for tool_call in tool_calls or []:
-            try:
-                arguments = json.loads(
-                    tool_call.function.arguments
-                )
-            except json.JSONDecodeError:
-                arguments = {}
+    def _build_tool_signature(self, name, arguments):
+        """生成Tool名称和参数的稳定签名，用于识别重复调用。"""
+        normalized_arguments = json.dumps(
+            arguments,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":")
+        )
 
-            parsed_calls.append(
-                {
-                    "name": tool_call.function.name,
-                    "arguments": arguments
-                }
-            )
-
-        return parsed_calls
+        return name, normalized_arguments
 
     def _get_clarification(self, question):
         """检查月份参数是否缺少年份。"""
@@ -109,9 +108,7 @@ class EcommerceAgent:
         )
 
         if has_month_only and not has_year_month:
-            return (
-                "请提供具体年份，例如“2011年11月”或“2011-11”。"
-            )
+            return "请提供具体年份，例如“2011年11月”或“2011-11”。"
 
         return None
 
@@ -119,9 +116,7 @@ class EcommerceAgent:
         """只执行第一轮LLM调用，用于检查Tool选择和参数提取。"""
         question = self._validate_question(question)
 
-        clarification = self._get_clarification(
-            question
-        )
+        clarification = self._get_clarification(question)
 
         if clarification:
             return {
@@ -130,9 +125,7 @@ class EcommerceAgent:
                 "content": clarification
             }
 
-        messages = self._build_messages(
-            question
-        )
+        messages = self._build_messages(question)
 
         response = self.provider.chat(
             messages=messages,
@@ -143,29 +136,20 @@ class EcommerceAgent:
 
         return {
             "question": question,
-            "tool_calls": self._parse_tool_calls(
-                message.tool_calls
-            ),
+            "tool_calls": self._parse_tool_calls(message.tool_calls),
             "content": message.content
         }
 
     def ask(self, question):
         """返回最终自然语言回答。"""
-        result = self.ask_with_trace(
-            question
-        )
-
+        result = self.ask_with_trace(question)
         return result["answer"]
 
     def ask_with_trace(self, question):
         """返回最终回答和Agent完整执行轨迹。"""
-        question = self._validate_question(
-            question
-        )
+        question = self._validate_question(question)
 
-        clarification = self._get_clarification(
-            question
-        )
+        clarification = self._get_clarification(question)
 
         if clarification:
             return {
@@ -176,9 +160,7 @@ class EcommerceAgent:
                 "grounding": None
             }
 
-        messages = self._build_messages(
-            question
-        )
+        messages = self._build_messages(question)
 
         trace = {
             "question": question,
@@ -186,9 +168,9 @@ class EcommerceAgent:
             "tool_results": []
         }
 
-        for _ in range(
-            self.max_tool_rounds
-        ):
+        successful_tool_cache = {}
+
+        for _ in range(self.max_tool_rounds):
             response = self.provider.chat(
                 messages=messages,
                 tools=self.tools
@@ -200,12 +182,10 @@ class EcommerceAgent:
                 answer = message.content
 
                 trace["answer"] = answer
-                trace["grounding"] = (
-                    self.validator.validate(
-                        answer,
-                        trace["tool_results"],
-                        trace["tool_calls"]
-                    )
+                trace["grounding"] = self.validator.validate(
+                    answer,
+                    trace["tool_results"],
+                    trace["tool_calls"]
                 )
 
                 return trace
@@ -214,25 +194,13 @@ class EcommerceAgent:
             parsed_calls = []
 
             for tool_call in message.tool_calls:
-                try:
-                    arguments = json.loads(
-                        tool_call.function.arguments
-                    )
-                except json.JSONDecodeError:
-                    arguments = {}
+                arguments = self._parse_arguments(tool_call)
 
                 parsed_calls.append(
                     (
                         tool_call,
                         arguments
                     )
-                )
-
-                trace["tool_calls"].append(
-                    {
-                        "name": tool_call.function.name,
-                        "arguments": arguments
-                    }
                 )
 
                 assistant_tool_calls.append(
@@ -255,17 +223,37 @@ class EcommerceAgent:
             )
 
             for tool_call, arguments in parsed_calls:
-                tool_result = run_tool(
-                    tool_call.function.name,
+                tool_name = tool_call.function.name
+
+                signature = self._build_tool_signature(
+                    tool_name,
                     arguments
                 )
 
-                trace["tool_results"].append(
-                    {
-                        "name": tool_call.function.name,
-                        "result": tool_result
-                    }
-                )
+                if signature in successful_tool_cache:
+                    tool_result = successful_tool_cache[signature]
+                else:
+                    tool_result = run_tool(
+                        tool_name,
+                        arguments
+                    )
+
+                    trace["tool_calls"].append(
+                        {
+                            "name": tool_name,
+                            "arguments": arguments
+                        }
+                    )
+
+                    trace["tool_results"].append(
+                        {
+                            "name": tool_name,
+                            "result": tool_result
+                        }
+                    )
+
+                    if tool_result.get("success") is True:
+                        successful_tool_cache[signature] = tool_result
 
                 messages.append(
                     {

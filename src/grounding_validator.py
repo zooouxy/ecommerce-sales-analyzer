@@ -18,7 +18,9 @@ TEXT_NUMERIC_EVIDENCE_KEYS = {
     "stock_code",
     "month",
     "first_purchase_date",
-    "last_purchase_date"
+    "last_purchase_date",
+    "data_start_date",
+    "data_end_date"
 }
 
 
@@ -31,18 +33,27 @@ def remove_list_markers(text):
     )
 
 
+def normalize_year_month(text):
+    """标准化YYYY-MM中的月份数字，移除月份前导零。"""
+    def replace(match):
+        year = match.group(1)
+        month = str(int(match.group(2)))
+        return f"{year} {month}"
+
+    return re.sub(
+        r"\b(\d{4})-(\d{1,2})\b",
+        replace,
+        text
+    )
+
+
 def extract_numbers(text):
     """提取文本中的数字并标准化格式。"""
     if not isinstance(text, str):
         return set()
 
     text = remove_list_markers(text)
-
-    text = re.sub(
-        r"\b(\d{4})-(\d{1,2})\b",
-        r"\1 \2",
-        text
-    )
+    text = normalize_year_month(text)
 
     numbers = re.findall(
         r"-?\d[\d,]*(?:\.\d+)?",
@@ -186,7 +197,6 @@ class GroundingValidator:
         tool_calls=None
     ):
         tool_calls = tool_calls or []
-
         warnings = []
 
         tool_success = tools_succeeded(

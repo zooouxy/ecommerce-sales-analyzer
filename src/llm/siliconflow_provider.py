@@ -58,7 +58,8 @@ class SiliconFlowProvider(LLMProvider):
         kwargs = {
             "model": self.model,
             "messages": messages,
-            "stream": False
+            "stream": False,
+            "temperature": 0
         }
 
         converted_tools = self._convert_tools(tools)
