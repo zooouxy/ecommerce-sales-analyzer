@@ -23,6 +23,8 @@ TEXT_NUMERIC_EVIDENCE_KEYS = {
     "data_end_date"
 }
 
+RAG_TOOL_NAME = "business_knowledge_search"
+
 
 def remove_list_markers(text):
     """移除行首编号，避免将列表序号识别为业务数字。"""
@@ -158,6 +160,105 @@ def has_currency_evidence(value):
     return False
 
 
+def is_rag_tool_item(item):
+    """判断Trace项是否来自RAG知识检索工具。"""
+    return (
+        isinstance(item, dict)
+        and item.get("name") == RAG_TOOL_NAME
+    )
+
+
+def split_tool_evidence(tool_results, tool_calls):
+    """将结构化Tool证据与RAG证据分离。"""
+    structured_results = [
+        item for item in tool_results
+        if not is_rag_tool_item(item)
+    ]
+    rag_results = [
+        item for item in tool_results
+        if is_rag_tool_item(item)
+    ]
+    structured_calls = [
+        item for item in tool_calls
+        if not is_rag_tool_item(item)
+    ]
+    rag_calls = [
+        item for item in tool_calls
+        if is_rag_tool_item(item)
+    ]
+
+    return (
+        structured_results,
+        rag_results,
+        structured_calls,
+        rag_calls
+    )
+
+
+def collect_rag_sources(rag_results):
+    """收集RAG最终使用的来源；优先显式sources，空时兼容回退results。"""
+    sources = []
+    seen = set()
+
+    for item in rag_results:
+        result = item.get("result", {})
+        data = result.get("data", result)
+
+        source_items = data.get("sources")
+
+        if not isinstance(source_items, list) or not source_items:
+            source_items = data.get("results", [])
+
+        for chunk in source_items:
+            if not isinstance(chunk, dict):
+                continue
+
+            source = {
+                "source_file": chunk.get("source_file"),
+                "section": chunk.get("section"),
+                "language": chunk.get("language"),
+                "domain": chunk.get("domain")
+            }
+
+            key = (
+                source["source_file"],
+                source["section"],
+                source["language"]
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            sources.append(source)
+
+    return sources
+
+
+def has_rag_evidence(rag_results):
+    """检查RAG Tool是否成功返回至少一个知识Chunk。"""
+    return bool(
+        collect_rag_sources(rag_results)
+    )
+
+
+def collect_rag_evidence_texts(rag_results):
+    """只收集RAG Chunk正文，避免score等元数据成为知识证据。"""
+    texts = set()
+
+    for item in rag_results:
+        result = item.get("result", {})
+        data = result.get("data", result)
+
+        for chunk in data.get("results", []):
+            content = chunk.get("content")
+
+            if isinstance(content, str) and content:
+                texts.add(content)
+
+    return texts
+
+
 def tools_succeeded(tool_results):
     """检查所有Tool是否执行成功。"""
     for item in tool_results:
@@ -211,12 +312,22 @@ class GroundingValidator:
                 }
             )
 
+        (
+            structured_results,
+            rag_results,
+            structured_calls,
+            rag_calls
+        ) = split_tool_evidence(
+            tool_results,
+            tool_calls
+        )
+
         result_numbers = collect_evidence_numbers(
-            tool_results
+            structured_results
         )
 
         argument_numbers = collect_evidence_numbers(
-            tool_calls
+            structured_calls
         )
 
         evidence_numbers = (
@@ -225,14 +336,45 @@ class GroundingValidator:
         )
 
         evidence_texts = collect_evidence_texts(
-            tool_results
+            structured_results
         )
 
         evidence_texts.update(
             collect_evidence_texts(
-                tool_calls
+                structured_calls
             )
         )
+
+        rag_evidence_texts = collect_rag_evidence_texts(
+            rag_results
+        )
+
+        evidence_texts.update(
+            rag_evidence_texts
+        )
+
+        rag_tool_used = bool(
+            rag_results or rag_calls
+        )
+
+        rag_evidence_available = has_rag_evidence(
+            rag_results
+        )
+
+        retrieved_sources = collect_rag_sources(
+            rag_results
+        )
+
+        if rag_tool_used and not rag_evidence_available:
+            warnings.append(
+                {
+                    "type": "rag_no_evidence",
+                    "message": (
+                        "已调用业务知识检索工具，"
+                        "但没有返回可用知识证据。"
+                    )
+                }
+            )
 
         cleaned_answer = remove_evidence_texts(
             answer,
@@ -259,7 +401,7 @@ class GroundingValidator:
             )
 
         supports_currency = has_currency_evidence(
-            tool_results
+            structured_results
         )
 
         uses_currency = any(
@@ -283,9 +425,12 @@ class GroundingValidator:
             "warnings": warnings,
             "checks": {
                 "tool_success": tool_success,
-                "supports_currency": supports_currency
+                "supports_currency": supports_currency,
+                "rag_tool_used": rag_tool_used,
+                "rag_evidence_available": rag_evidence_available
             },
             "evidence_numbers": sorted(
                 evidence_numbers
-            )
+            ),
+            "retrieved_sources": retrieved_sources
         }

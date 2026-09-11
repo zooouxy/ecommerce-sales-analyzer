@@ -1,6 +1,6 @@
 # E-commerce Sales Analyzer
 
-> AI-powered ecommerce analytics project combining deterministic data analysis, SQL-based analytical serving, an LLM agent, advanced business reasoning, and an interactive Streamlit dashboard.
+> AI-powered ecommerce analytics project combining deterministic data analysis, SQL-based analytical serving, an LLM agent, local RAG business knowledge, provenance-aware hybrid reasoning, and an interactive Streamlit dashboard.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ## Project Introduction
 
-E-commerce Sales Analyzer is an AI-powered ecommerce analytics project that combines structured data analysis, deterministic business logic, SQL-based analytical serving, an LLM agent, and an interactive Streamlit dashboard.
+E-commerce Sales Analyzer is an AI-powered ecommerce analytics project that combines structured data analysis, deterministic business logic, SQL-based analytical serving, an LLM agent, local RAG business knowledge, provenance-aware hybrid reasoning, and an interactive Streamlit dashboard.
 
 The project follows a layered architecture:
 
@@ -115,15 +115,31 @@ docs/zh/Phase4_Advanced_Analytics_CN.md
 ```
 
 ### Phase 5 — Structured Data + RAG Hybrid
-⬜ Planned
+✅ Complete
 
-Planned focus:
+- Five-document bilingual ecommerce knowledge base
+- Markdown heading-aware knowledge loading and chunking
+- SiliconFlow embedding integration with `Qwen/Qwen3-Embedding-0.6B`
+- Local NumPy cosine-similarity vector store
+- JSON index persistence in `data/rag_index.json`
+- Language-aware retrieval and bilingual duplicate suppression
+- `business_knowledge_search` Tool integration
+- Structured-only / RAG-only / Hybrid routing
+- Deterministic customer-segment knowledge claims, selection, and rendering
+- `deterministic_rag` answer mode
+- `deterministic_hybrid` answer mode
+- Explicit provenance for model general knowledge
+- Deterministic unsupported-number / unsupported-currency sanitizer
+- RAG source alignment in Grounding trace
+- Phase 5 Agent regression testing
+- Streamlit Answer Mode and Knowledge Sources visibility
 
-- Minimal demonstrable RAG workflow
-- Business knowledge retrieval
-- Structured analytics + retrieved knowledge hybrid answers
-- Integration with the existing Agent / Tool architecture
-- Keep business metrics deterministic while using retrieval for contextual knowledge
+Detailed documentation:
+
+```text
+docs/en/Phase5_Structured_Data_RAG_Hybrid_EN.md
+docs/zh/Phase5_Structured_Data_RAG_Hybrid_CN.md
+```
 
 ### Phase 6 — Portfolio Packaging & Demo
 ⬜ Planned
@@ -252,6 +268,7 @@ product_comparison
 product_concentration
 customer_segments
 segment_comparison
+business_knowledge_search
 ```
 
 The frozen Agent access path remains:
@@ -293,14 +310,25 @@ Champions客户贡献了多少收入？
 整体销售收入是多少，同时Top 10商品占整体商品收入多少？
 ```
 
-The Agent selects the required analytical tools, retrieves structured results through the Query Service, and generates answers grounded in returned data.
+The Agent selects between structured analytical tools and business-knowledge retrieval. Structured facts continue to come from the Query Service, while explanatory and operational knowledge can come from RAG.
+
+Phase 5 supports:
+
+```text
+Structured-only
+RAG-only
+Hybrid
+General model suggestions with explicit provenance
+```
 
 The Streamlit interface exposes:
 
 ```text
+Answer Mode
 Tool Calls
 Tool Results
 Grounding Validation
+Knowledge Sources
 ```
 
 This makes the Agent workflow observable rather than operating as a black box.
@@ -425,6 +453,37 @@ If multiple metrics have different winners, the Agent reports metric-level resul
 
 ---
 
+## Structured Data + RAG Hybrid
+
+Phase 5 introduces a second evidence path without changing the structured-data contract:
+
+```text
+User
+│
+└── AI Analyst
+    └── LLM Agent
+        ├── Structured Tools
+        │   └── Query Service
+        │       └── SQL / Views
+        │           └── SQLite
+        │
+        └── business_knowledge_search
+            └── Knowledge Retriever
+                └── Local Vector Store
+                    └── Bilingual Knowledge Base
+```
+
+Supported response paths:
+
+```text
+Structured-only
+RAG-only
+Hybrid
+General Suggestions with explicit provenance
+```
+
+For supported customer-segmentation knowledge, RAG output uses deterministic claims, selection, and rendering. Hybrid customer-segment answers deterministically combine structured facts with rendered knowledge instead of asking the LLM to rewrite both sources.
+
 ## Grounding & Reliability
 
 The Grounding layer intentionally remains lightweight and deterministic.
@@ -436,6 +495,10 @@ Current checks include:
 - Unsupported currency or monetary units
 - Numeric evidence from Tool Call arguments
 - Numeric and metadata evidence from Tool Results
+- RAG Tool usage and evidence availability
+- Retrieved knowledge source tracking
+- Selected-source alignment for deterministic knowledge output
+- Deterministic sanitation of unsupported numeric / currency claims in free-form answers
 
 The Agent also includes duplicate successful Tool Call suppression:
 
@@ -530,6 +593,7 @@ product_comparison
 product_concentration
 customer_segments
 segment_comparison
+business_knowledge_search
 ```
 
 Verified result:
@@ -557,12 +621,42 @@ Product comparison
 
 Customer-segment comparison
 → segment_comparison
+business_knowledge_search
 ```
 
 Verified result:
 
 ```text
 ALL PHASE 4 AGENT REGRESSION TESTS PASSED
+```
+
+### Phase 5 Agent Regression
+
+Validated routes include:
+
+```text
+Structured-only
+→ customer_segments
+
+RAG-only
+→ business_knowledge_search
+→ deterministic_rag
+
+Hybrid
+→ customer_segments + business_knowledge_search
+→ deterministic_hybrid
+
+General Suggestions
+→ explicit non-knowledge-base provenance
+
+Phase 4 Product Comparison
+→ product_comparison
+```
+
+Verified result:
+
+```text
+ALL PHASE 5 AGENT REGRESSION TESTS PASSED
 ```
 
 ### Streamlit Validation
@@ -575,6 +669,9 @@ Monthly trend insight
 Month comparison
 Product comparison
 Customer segment comparison
+RAG-only customer-segment strategy
+Structured + RAG Hybrid
+General Suggestions provenance
 ```
 
 Tool Calls, Tool Results, and Grounding Validation were also verified through the Streamlit interface.
@@ -605,6 +702,7 @@ Create a `.env` file in the project root:
 ```text
 SILICONFLOW_API_KEY=your_api_key
 SILICONFLOW_MODEL=Qwen/Qwen3-8B
+SILICONFLOW_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
 ```
 
 Do not commit `.env` to Git.
@@ -621,7 +719,9 @@ The application will normally be available at:
 http://localhost:8501
 ```
 
-### 5. Run Phase 4 regression tests
+### 5. Run regression tests
+
+Phase 4:
 
 ```bash
 PYTHONIOENCODING=utf-8 python tests/test_phase4_regression.py
@@ -629,6 +729,12 @@ PYTHONIOENCODING=utf-8 python tests/test_phase4_regression.py
 
 ```bash
 PYTHONIOENCODING=utf-8 python tests/test_agent_regression.py
+```
+
+Phase 5:
+
+```bash
+PYTHONIOENCODING=utf-8 python tests/test_phase5_regression.py
 ```
 
 ---
@@ -668,6 +774,11 @@ Known limitations include:
 - Streamlit chat history is UI-level history; the Agent does not yet maintain full cross-question conversational memory
 - Very large compound requests may exceed the configured maximum number of Agent tool rounds
 - The current Grounding layer intentionally remains lightweight instead of becoming a second reasoning model
+- Deterministic knowledge-claim extraction is currently strongest for customer-segmentation knowledge
+- Other RAG domains can still rely on retrieved chunks plus LLM synthesis
+- The local knowledge base is manually maintained
+- The current RAG stack intentionally excludes rerankers, BM25, query rewriting, external vector databases, and a second LLM judge
+- Explicitly requested model-general suggestions are allowed but are labeled separately from knowledge-base content
 
 See:
 
@@ -696,7 +807,7 @@ Phase 4 — Advanced Analytics & Business Reasoning
 ✅ Complete
 
 Phase 5 — Structured Data + RAG Hybrid
-⬜ Planned
+✅ Complete
 
 Phase 6 — Portfolio Packaging & Demo
 ⬜ Planned
@@ -708,7 +819,7 @@ Phase 6 — Portfolio Packaging & Demo
 
 ## 项目简介
 
-E-commerce Sales Analyzer 是一个 AI 驱动的电商数据分析项目，将结构化数据分析、确定性业务计算、SQL 分析服务层、LLM 智能体、高级业务推理以及 Streamlit 交互式仪表盘整合在同一个系统中。
+E-commerce Sales Analyzer 是一个 AI 驱动的电商数据分析项目，将结构化数据分析、确定性业务计算、SQL 分析服务层、LLM 智能体、本地 RAG 业务知识、来源可追踪的混合推理以及 Streamlit 交互式仪表盘整合在同一个系统中。
 
 项目采用分层架构：
 
@@ -815,15 +926,31 @@ docs/zh/Phase4_Advanced_Analytics_CN.md
 ```
 
 ### Phase 5 — Structured Data + RAG Hybrid
-⬜ 计划中
+✅ 已完成
 
-计划重点：
+- 5 个中英双语电商业务知识文档
+- 基于 Markdown Heading 的知识加载与 Chunking
+- SiliconFlow Embedding：`Qwen/Qwen3-Embedding-0.6B`
+- NumPy Cosine Similarity 本地向量检索
+- `data/rag_index.json` JSON 索引持久化
+- 语言偏好与中英重复内容抑制
+- `business_knowledge_search` Tool 集成
+- Structured-only / RAG-only / Hybrid 路由
+- 客户分群知识的确定性 Claim / Selector / Renderer
+- `deterministic_rag` Answer Mode
+- `deterministic_hybrid` Answer Mode
+- 模型通用知识显式 Provenance 分层
+- Unsupported Number / Currency 确定性 Sanitizer
+- Grounding Trace 中的 RAG Source Alignment
+- Phase 5 Agent Regression
+- Streamlit Answer Mode 与 Knowledge Sources 展示
 
-- 实现最小但可演示的 RAG 工作流
-- 业务知识检索
-- 结构化分析结果 + 检索知识的混合回答
-- 与现有 Agent / Tool 架构集成
-- 核心业务指标继续保持确定性
+详细文档：
+
+```text
+docs/en/Phase5_Structured_Data_RAG_Hybrid_EN.md
+docs/zh/Phase5_Structured_Data_RAG_Hybrid_CN.md
+```
 
 ### Phase 6 — 作品集包装与 Demo
 ⬜ 计划中
@@ -952,6 +1079,7 @@ product_comparison
 product_concentration
 customer_segments
 segment_comparison
+business_knowledge_search
 ```
 
 Agent 的固定数据访问链路保持：
@@ -993,14 +1121,25 @@ Champions客户贡献了多少收入？
 整体销售收入是多少，同时Top 10商品占整体商品收入多少？
 ```
 
-Agent 会根据问题选择所需分析工具，通过 Query Service 获取结构化结果，再基于返回数据生成回答。
+Agent 会根据问题在结构化分析 Tool 与业务知识检索之间进行路由。确定性数据事实继续来自 Query Service，而业务定义、解释框架与运营知识可以来自 RAG。
+
+Phase 5 支持：
+
+```text
+Structured-only
+RAG-only
+Hybrid
+显式标注来源的模型通用建议
+```
 
 Streamlit 页面同时展示：
 
 ```text
+Answer Mode
 Tool Calls
 Tool Results
 Grounding Validation
+Knowledge Sources
 ```
 
 因此 Agent 的执行过程是可观察的，而不是完全黑盒。
@@ -1125,6 +1264,37 @@ revenue_percentage_difference_pp
 
 ---
 
+## Structured Data + RAG Hybrid
+
+Phase 5 在不改变结构化数据访问契约的前提下增加第二条知识证据路径：
+
+```text
+用户
+│
+└── AI Analyst
+    └── LLM Agent
+        ├── Structured Tools
+        │   └── Query Service
+        │       └── SQL / Views
+        │           └── SQLite
+        │
+        └── business_knowledge_search
+            └── Knowledge Retriever
+                └── Local Vector Store
+                    └── Bilingual Knowledge Base
+```
+
+当前支持：
+
+```text
+Structured-only
+RAG-only
+Hybrid
+显式 Provenance 的 General Suggestions
+```
+
+对于支持的客户分群知识，RAG 使用确定性 Claim、Selector 和 Renderer。客户分群 Hybrid 回答会确定性组合结构化事实与知识库文本，而不是再次让 LLM 自由改写两类证据。
+
 ## Grounding 与可靠性
 
 Grounding 层有意保持轻量、确定性。
@@ -1136,6 +1306,10 @@ Grounding 层有意保持轻量、确定性。
 - 回答是否自行补充未经支持的币种 / 货币单位
 - Tool Call 参数中的数字证据
 - Tool Result 中的数字和元数据证据
+- RAG Tool 调用与证据可用性
+- 检索知识来源追踪
+- 确定性知识输出的 Selected Source Alignment
+- 自由生成回答中 Unsupported Number / Currency 的确定性清理
 
 Agent 还实现了成功 Tool Call 的程序级去重：
 
@@ -1230,6 +1404,7 @@ product_comparison
 product_concentration
 customer_segments
 segment_comparison
+business_knowledge_search
 ```
 
 验证结果：
@@ -1257,12 +1432,42 @@ ALL PHASE 4 TOOL REGRESSION TESTS PASSED
 
 客户分群比较
 → segment_comparison
+business_knowledge_search
 ```
 
 验证结果：
 
 ```text
 ALL PHASE 4 AGENT REGRESSION TESTS PASSED
+```
+
+### Phase 5 Agent Regression
+
+已验证路由：
+
+```text
+Structured-only
+→ customer_segments
+
+RAG-only
+→ business_knowledge_search
+→ deterministic_rag
+
+Hybrid
+→ customer_segments + business_knowledge_search
+→ deterministic_hybrid
+
+General Suggestions
+→ 显式标注非知识库来源
+
+Phase 4 商品比较回归
+→ product_comparison
+```
+
+验证结果：
+
+```text
+ALL PHASE 5 AGENT REGRESSION TESTS PASSED
 ```
 
 ### Streamlit Validation
@@ -1275,6 +1480,9 @@ ALL PHASE 4 AGENT REGRESSION TESTS PASSED
 月份比较
 商品比较
 客户分群比较
+RAG-only 客户分群策略
+Structured + RAG Hybrid
+General Suggestions Provenance
 ```
 
 同时验证了：
@@ -1313,6 +1521,7 @@ python -m pip install -r requirements.txt
 ```text
 SILICONFLOW_API_KEY=your_api_key
 SILICONFLOW_MODEL=Qwen/Qwen3-8B
+SILICONFLOW_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
 ```
 
 不要将 `.env` 提交到 Git。
@@ -1329,7 +1538,9 @@ python -m streamlit run app.py
 http://localhost:8501
 ```
 
-### 5. 运行 Phase 4 回归测试
+### 5. 运行回归测试
+
+Phase 4：
 
 ```bash
 PYTHONIOENCODING=utf-8 python tests/test_phase4_regression.py
@@ -1337,6 +1548,12 @@ PYTHONIOENCODING=utf-8 python tests/test_phase4_regression.py
 
 ```bash
 PYTHONIOENCODING=utf-8 python tests/test_agent_regression.py
+```
+
+Phase 5：
+
+```bash
+PYTHONIOENCODING=utf-8 python tests/test_phase5_regression.py
 ```
 
 ---
@@ -1376,6 +1593,11 @@ python-dotenv==1.2.1
 - Streamlit 当前保存的是 UI 层聊天历史，Agent 尚未维护跨问题的完整对话记忆
 - 超大型复合查询可能超过当前 Agent 配置的最大 Tool Calling 轮数
 - 当前 Grounding 层有意保持轻量，不把它扩展成第二个推理模型
+- 确定性 Knowledge Claim 抽取目前主要覆盖客户分群知识
+- 其他 RAG 知识域仍可能使用检索 Chunk + LLM 生成
+- 当前知识库由本地文件人工维护
+- 当前 RAG 栈有意不加入 reranker、BM25、query rewriting、外部向量数据库或第二个 LLM Judge
+- 用户明确请求的模型通用建议可以生成，但必须与知识库内容显式区分
 
 Phase 4 的详细实现与限制请参考：
 
@@ -1402,7 +1624,7 @@ Phase 4 — 高级分析与业务推理
 ✅ 已完成
 
 Phase 5 — Structured Data + RAG Hybrid
-⬜ 计划中
+✅ 已完成
 
 Phase 6 — 作品集包装与 Demo
 ⬜ 计划中

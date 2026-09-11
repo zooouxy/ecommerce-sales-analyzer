@@ -580,7 +580,7 @@ def render_customer_analysis():
 
 
 def render_agent_trace(trace):
-    """渲染Agent执行轨迹。"""
+    """渲染Agent执行轨迹、回答模式和知识来源。"""
     with st.expander(
         "Agent Trace",
         expanded=False
@@ -598,6 +598,22 @@ def render_agent_trace(trace):
         grounding = trace.get(
             "grounding"
         )
+
+        answer_mode = trace.get(
+            "answer_mode"
+        )
+
+        st.markdown("#### Answer Mode")
+
+        if answer_mode:
+            st.code(
+                answer_mode,
+                language=None
+            )
+        else:
+            st.caption(
+                "LLM synthesis with grounded tool evidence."
+            )
 
         st.markdown("#### Tool Calls")
 
@@ -635,6 +651,37 @@ def render_agent_trace(trace):
                 "Review the evidence below."
             )
 
+        retrieved_sources = grounding.get(
+            "retrieved_sources",
+            []
+        )
+
+        if retrieved_sources:
+            st.markdown("#### Knowledge Sources")
+
+            for source in retrieved_sources:
+                source_file = source.get(
+                    "source_file",
+                    "Unknown source"
+                )
+                section = source.get(
+                    "section",
+                    "Unknown section"
+                )
+                language = source.get(
+                    "language",
+                    "unknown"
+                )
+                domain = source.get(
+                    "domain",
+                    "unknown"
+                )
+
+                st.markdown(
+                    f"- **{source_file}** — {section}  \\n"
+                    f"  `{language}` · `{domain}`"
+                )
+
         st.json(grounding)
 
 
@@ -643,8 +690,8 @@ def render_ai_analyst():
     st.title("AI Analyst")
     st.caption(
         "Ask ecommerce business questions in natural language. "
-        "The Agent selects analytical tools and answers from "
-        "structured query results."
+        "The Agent combines structured analytics, retrieved business "
+        "knowledge, and grounded answer generation."
     )
 
     with st.expander(
@@ -656,7 +703,9 @@ def render_ai_analyst():
 - 2011年11月销售情况怎么样？
 - 商品22423的销售表现怎么样？
 - Champions客户贡献了多少收入？
-- 整体销售收入是多少，同时Top 10商品占整体商品收入多少？
+- Champions客户应该怎么运营？
+- Champions客户贡献了多少收入，并且应该怎么运营？
+- 除了知识库里的策略，还有哪些通用运营建议？
 """
         )
 

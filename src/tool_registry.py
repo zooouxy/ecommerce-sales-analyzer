@@ -1,4 +1,5 @@
 from src.tools import (
+    business_knowledge_search_tool,
     customer_segments_tool,
     customer_value_tool,
     month_comparison_tool,
@@ -246,6 +247,38 @@ TOOL_REGISTRY = {
                     "普通指标差值按segment_b减segment_a计算。"
                     "可使用：Champions、Loyal Customers、Regular Customers、"
                     "High Value Lost、Lost Customers、At Risk、Big Spenders。"
+                )
+            }
+        }
+    },
+    "business_knowledge_search": {
+        "function": business_knowledge_search_tool,
+        "description": (
+            "检索电商业务知识库，用于回答业务定义、指标含义、分析解释框架、"
+            "客户分群运营策略、商品表现解读、销售趋势解读和一般业务建议。"
+            "该工具提供非结构化业务知识，不负责查询当前销售收入、订单数、"
+            "销量、客户数量、排名、增长率或其他确定性业务数值。"
+            "纯数据事实应使用对应Structured Tool；"
+            "如果用户同时询问数据事实和业务解释或建议，"
+            "可以同时调用对应Structured Tool和本工具。"
+            "query应保留用户问题中需要检索的业务语义，不要自行添加新的业务事实。"
+        ),
+        "parameters": {
+            "query": {
+                "type": "string",
+                "required": True,
+                "description": (
+                    "要检索的业务知识问题或语义查询，例如"
+                    "Champions客户应该怎么运营？"
+                    "或平均订单价值是什么？"
+                )
+            },
+            "top_k": {
+                "type": "integer",
+                "required": False,
+                "description": (
+                    "可选返回知识片段数量，必须为正整数；"
+                    "未指定时默认返回3条。"
                 )
             }
         }

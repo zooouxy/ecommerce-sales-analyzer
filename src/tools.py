@@ -1,3 +1,7 @@
+from src.rag.knowledge_claims import build_knowledge_claims
+from src.rag.knowledge_renderer import render_knowledge_claims
+from src.rag.knowledge_selector import select_knowledge_claims
+from src.rag.retriever import KnowledgeRetriever
 from src.query_service import (
     get_customer_segments,
     get_customer_value,
@@ -75,3 +79,33 @@ def segment_comparison_tool(segment_a, segment_b):
         segment_a=segment_a,
         segment_b=segment_b
     )
+
+def business_knowledge_search_tool(query, top_k=3):
+    """检索业务知识库，并补充可确定性渲染的结构化知识。"""
+    retriever = KnowledgeRetriever()
+
+    retrieval = retriever.retrieve(
+        query=query,
+        top_k=top_k
+    )
+
+    claims_payload = build_knowledge_claims(retrieval)
+    selected_payload = select_knowledge_claims(claims_payload)
+    rendered_payload = render_knowledge_claims(selected_payload)
+
+    sources = [
+        {
+            "source_file": item.get("source_file"),
+            "section": item.get("section"),
+            "language": item.get("language"),
+            "domain": item.get("domain")
+        }
+        for item in rendered_payload["rendered_knowledge"]
+    ]
+
+    return {
+        **retrieval,
+        "knowledge_claims": selected_payload["knowledge_claims"],
+        "rendered_knowledge": rendered_payload["rendered_knowledge"],
+        "sources": sources
+    }
