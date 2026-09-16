@@ -18,8 +18,11 @@ data/raw/*.xlsx
 # Processed data
 data/processed/*.csv
 
-# Generated SQLite database
+# Generated SQLite databases
 database/*.db
+
+# Keep the prebuilt demo database for Streamlit deployment
+!database/ecommerce.db
 
 tools/sqlite/
 

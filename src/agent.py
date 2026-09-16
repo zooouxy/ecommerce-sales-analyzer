@@ -2,6 +2,7 @@ import json
 import re
 
 from src.grounding_validator import GroundingValidator
+from src.structured_fallback_renderer import StructuredFallbackRenderer
 from src.llm.siliconflow_provider import SiliconFlowProvider
 from src.tool_registry import get_function_schemas
 from src.tool_router import run_tool
@@ -48,6 +49,7 @@ class EcommerceAgent:
         self.tools = get_function_schemas()
         self.max_tool_rounds = max_tool_rounds
         self.validator = validator or GroundingValidator()
+        self.structured_fallback_renderer = StructuredFallbackRenderer()
 
     def _validate_question(self, question):
         """校验并标准化用户问题。"""
@@ -193,6 +195,29 @@ class EcommerceAgent:
             rendered.append("\n".join(lines))
 
         return "\n\n".join(rendered)
+
+    def _get_structured_fallback_answer(self, trace):
+        """结构化LLM回答不可用时，使用通用确定性Renderer兜底。"""
+        tool_calls = trace.get("tool_calls", [])
+        tool_results = trace.get("tool_results", [])
+
+        if len(tool_calls) != 1 or len(tool_results) != 1:
+            return None
+
+        tool_name = tool_calls[0].get("name")
+
+        if not tool_name or tool_name == "business_knowledge_search":
+            return None
+
+        item = tool_results[0]
+
+        if item.get("name") != tool_name:
+            return None
+
+        return self.structured_fallback_renderer.render(
+            tool_name=tool_name,
+            tool_result=item.get("result", {})
+        )
 
     def _get_deterministic_hybrid_answer(self, question, trace):
         """客户分群事实 + RAG知识并存时，确定性组合两类证据。"""
@@ -469,6 +494,9 @@ class EcommerceAgent:
         }
 
         successful_tool_cache = {}
+        allow_general_knowledge = self._requests_general_suggestions(
+            question
+        )
 
         for _ in range(self.max_tool_rounds):
             response = self.provider.chat(
@@ -481,10 +509,22 @@ class EcommerceAgent:
             if not message.tool_calls:
                 answer = message.content
 
+                if not isinstance(answer, str) or not answer.strip():
+                    fallback_answer = self._get_structured_fallback_answer(
+                        trace
+                    )
+
+                    if fallback_answer is not None:
+                        answer = fallback_answer
+                        trace["answer_mode"] = (
+                            "deterministic_structured_fallback"
+                        )
+
                 grounding = self.validator.validate(
                     answer,
                     trace["tool_results"],
-                    trace["tool_calls"]
+                    trace["tool_calls"],
+                    allow_general_knowledge=allow_general_knowledge
                 )
 
                 sanitized_answer = self._sanitize_grounding_answer(
@@ -497,7 +537,8 @@ class EcommerceAgent:
                     grounding = self.validator.validate(
                         answer,
                         trace["tool_results"],
-                        trace["tool_calls"]
+                        trace["tool_calls"],
+                        allow_general_knowledge=allow_general_knowledge
                     )
                     trace["grounding_sanitizer_applied"] = True
 
@@ -511,9 +552,29 @@ class EcommerceAgent:
                     grounding = self.validator.validate(
                         answer,
                         trace["tool_results"],
-                        trace["tool_calls"]
+                        trace["tool_calls"],
+                        allow_general_knowledge=allow_general_knowledge
                     )
                     trace["provenance_normalization_applied"] = True
+
+                # 后处理可能把原本非空的LLM回答整段删除。
+                # 最终返回前再次检查，并仅使用已支持的结构化Tool结果兜底。
+                if not isinstance(answer, str) or not answer.strip():
+                    fallback_answer = self._get_structured_fallback_answer(
+                        trace
+                    )
+
+                    if fallback_answer is not None:
+                        answer = fallback_answer
+                        trace["answer_mode"] = (
+                            "deterministic_structured_fallback"
+                        )
+                        grounding = self.validator.validate(
+                            answer,
+                            trace["tool_results"],
+                            trace["tool_calls"],
+                            allow_general_knowledge=allow_general_knowledge
+                        )
 
                 trace["answer"] = answer
                 trace["grounding"] = grounding
@@ -606,7 +667,8 @@ class EcommerceAgent:
                 trace["grounding"] = self.validator.validate(
                     deterministic_hybrid_answer,
                     trace["tool_results"],
-                    trace["tool_calls"]
+                    trace["tool_calls"],
+                    allow_general_knowledge=allow_general_knowledge
                 )
                 trace["answer_mode"] = "deterministic_hybrid"
 
@@ -622,7 +684,8 @@ class EcommerceAgent:
                 trace["grounding"] = self.validator.validate(
                     deterministic_rag_answer,
                     trace["tool_results"],
-                    trace["tool_calls"]
+                    trace["tool_calls"],
+                    allow_general_knowledge=allow_general_knowledge
                 )
                 trace["answer_mode"] = "deterministic_rag"
 

@@ -196,7 +196,7 @@ def split_tool_evidence(tool_results, tool_calls):
 
 
 def collect_rag_sources(rag_results):
-    """收集RAG最终使用的来源；优先显式sources，空时兼容回退results。"""
+    """收集RAG最终使用的来源；优先使用Tool显式sources，兼容旧results。"""
     sources = []
     seen = set()
 
@@ -206,7 +206,7 @@ def collect_rag_sources(rag_results):
 
         source_items = data.get("sources")
 
-        if not isinstance(source_items, list) or not source_items:
+        if not isinstance(source_items, list):
             source_items = data.get("results", [])
 
         for chunk in source_items:
@@ -295,10 +295,30 @@ class GroundingValidator:
         self,
         answer,
         tool_results,
-        tool_calls=None
+        tool_calls=None,
+        allow_general_knowledge=False
     ):
         tool_calls = tool_calls or []
         warnings = []
+
+        answer_non_empty = (
+            isinstance(answer, str)
+            and bool(answer.strip())
+        )
+
+        if not answer_non_empty:
+            warnings.append(
+                {
+                    "type": "empty_answer",
+                    "message": "Agent未生成可展示的自然语言回答。"
+                }
+            )
+
+        safe_answer = (
+            answer
+            if isinstance(answer, str)
+            else ""
+        )
 
         tool_success = tools_succeeded(
             tool_results
@@ -365,7 +385,11 @@ class GroundingValidator:
             rag_results
         )
 
-        if rag_tool_used and not rag_evidence_available:
+        if (
+            rag_tool_used
+            and not rag_evidence_available
+            and not allow_general_knowledge
+        ):
             warnings.append(
                 {
                     "type": "rag_no_evidence",
@@ -377,7 +401,7 @@ class GroundingValidator:
             )
 
         cleaned_answer = remove_evidence_texts(
-            answer,
+            safe_answer,
             evidence_texts
         )
 
@@ -405,7 +429,7 @@ class GroundingValidator:
         )
 
         uses_currency = any(
-            term in answer
+            term in safe_answer
             for term in CURRENCY_TERMS
         )
 
@@ -424,10 +448,12 @@ class GroundingValidator:
             "passed": len(warnings) == 0,
             "warnings": warnings,
             "checks": {
+                "answer_non_empty": answer_non_empty,
                 "tool_success": tool_success,
                 "supports_currency": supports_currency,
                 "rag_tool_used": rag_tool_used,
-                "rag_evidence_available": rag_evidence_available
+                "rag_evidence_available": rag_evidence_available,
+                "general_knowledge_allowed": allow_general_knowledge
             },
             "evidence_numbers": sorted(
                 evidence_numbers

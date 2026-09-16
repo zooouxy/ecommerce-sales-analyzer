@@ -1,17 +1,24 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.agent import EcommerceAgent
+from src.structured_fallback_renderer import StructuredFallbackRenderer
 
 
 def assert_grounding_passed(trace, question):
-    """检查Grounding是否通过。"""
+    """检查Grounding是否通过且最终回答非空。"""
     assert trace["grounding"]["passed"] is True, (
         f"Grounding failed for question: {question}\n"
         f"{trace['grounding']}"
+    )
+    assert trace["grounding"]["checks"][
+        "answer_non_empty"
+    ] is True, (
+        f"Grounding accepted an empty answer: {question}"
     )
 
 
@@ -30,6 +37,242 @@ def assert_non_empty_answer(trace, question):
     assert isinstance(answer, str) and answer.strip(), (
         f"Empty answer for question: {question}"
     )
+
+
+class EmptyFinalAnswerProvider:
+    """模拟Tool成功后LLM最终返回空文本。"""
+
+    def __init__(self):
+        self.call_count = 0
+
+    def chat(self, messages, tools=None):
+        self.call_count += 1
+
+        if self.call_count == 1:
+            tool_call = SimpleNamespace(
+                id="call_customer_segments",
+                function=SimpleNamespace(
+                    name="customer_segments",
+                    arguments='{"segment":"Champions"}'
+                )
+            )
+            message = SimpleNamespace(
+                content=None,
+                tool_calls=[tool_call]
+            )
+        else:
+            message = SimpleNamespace(
+                content="",
+                tool_calls=[]
+            )
+
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=message
+                )
+            ]
+        )
+
+
+class SanitizedToEmptyProvider:
+    """模拟LLM返回非空但整段会被Grounding Sanitizer删除的回答。"""
+
+    def __init__(self):
+        self.call_count = 0
+
+    def chat(self, messages, tools=None):
+        self.call_count += 1
+
+        if self.call_count == 1:
+            tool_call = SimpleNamespace(
+                id="call_customer_segments",
+                function=SimpleNamespace(
+                    name="customer_segments",
+                    arguments='{"segment":"Champions"}'
+                )
+            )
+            message = SimpleNamespace(
+                content=None,
+                tool_calls=[tool_call]
+            )
+        else:
+            # 999不在Tool证据中，因此这一整行会被Sanitizer删除。
+            message = SimpleNamespace(
+                content="Champions客户贡献收入为999。",
+                tool_calls=[]
+            )
+
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=message
+                )
+            ]
+        )
+
+
+def run_generic_structured_renderer_case():
+    """验证Fallback不再只支持customer_segments专用模板。"""
+    renderer = StructuredFallbackRenderer()
+
+    print("=" * 70)
+    print("CASE: Generic Structured Fallback Renderer")
+
+    sales_result = {
+        "success": True,
+        "tool": "sales_kpi",
+        "data": {
+            "total_revenue": 10666684.54,
+            "total_orders": 19960,
+            "total_quantity": 5588376,
+            "average_order_value": 534.4
+        }
+    }
+
+    sales_answer = renderer.render(
+        "sales_kpi",
+        sales_result
+    )
+
+    assert isinstance(sales_answer, str) and sales_answer.strip()
+    assert "10,666,684.54" in sales_answer
+    assert "19,960" in sales_answer
+    assert "5,588,376" in sales_answer
+    assert "534.40" in sales_answer
+
+    comparison_result = {
+        "success": True,
+        "tool": "product_comparison",
+        "data": {
+            "entity_type": "product",
+            "stock_code_a": "22423",
+            "stock_code_b": "85123A",
+            "left": {
+                "stock_code": "22423",
+                "revenue": 174484.74,
+                "quantity": 13879
+            },
+            "right": {
+                "stock_code": "85123A",
+                "revenue": 106471.28,
+                "quantity": 37952
+            },
+            "comparison": {
+                "higher_revenue_product": "22423",
+                "higher_quantity_product": "85123A"
+            },
+            "missing_stock_codes": []
+        }
+    }
+
+    comparison_answer = renderer.render(
+        "product_comparison",
+        comparison_result
+    )
+
+    assert isinstance(comparison_answer, str) and comparison_answer.strip()
+    assert "174,484.74" in comparison_answer
+    assert "106,471.28" in comparison_answer
+    assert "收入更高的商品：22423" in comparison_answer
+    assert "销量更高的商品：85123A" in comparison_answer
+
+    print("PASS")
+
+
+def run_structured_sanitizer_fallback_case():
+    """验证非空LLM回答被Sanitizer清空后，最终fallback能够接管。"""
+    question = "Champions客户贡献了多少收入？"
+    fallback_agent = EcommerceAgent(
+        provider=SanitizedToEmptyProvider()
+    )
+
+    print("=" * 70)
+    print("CASE: Structured Sanitizer Empty Fallback")
+    print("QUESTION:")
+    print(question)
+
+    trace = fallback_agent.ask_with_trace(question)
+
+    print("\nANSWER:")
+    print(trace["answer"])
+    print("\nTOOL CALLS:")
+    print(trace["tool_calls"])
+    print("\nGROUNDING:")
+    print(trace["grounding"])
+
+    assert get_tool_names(trace) == ["customer_segments"]
+    assert trace.get("grounding_sanitizer_applied") is True
+    assert trace.get("answer_mode") == (
+        "deterministic_structured_fallback"
+    )
+
+    assert_non_empty_answer(trace, question)
+
+    normalized_answer = trace["answer"].replace(",", "")
+
+    for expected_value in [
+        "3218123.84",
+        "36.11",
+        "148",
+        "21744.08"
+    ]:
+        assert expected_value in normalized_answer, (
+            f"Missing post-sanitizer fallback fact: {expected_value}"
+        )
+
+    assert "999" not in normalized_answer
+    assert_grounding_passed(trace, question)
+
+    print("PASS")
+
+
+def run_structured_empty_answer_fallback_case():
+    """验证Structured Tool成功但LLM空响应时启用确定性回退。"""
+    question = "Champions客户贡献了多少收入？"
+    fallback_agent = EcommerceAgent(
+        provider=EmptyFinalAnswerProvider()
+    )
+
+    print("=" * 70)
+    print("CASE: Structured Empty Answer Fallback")
+    print("QUESTION:")
+    print(question)
+
+    trace = fallback_agent.ask_with_trace(question)
+
+    print("\nANSWER:")
+    print(trace["answer"])
+    print("\nTOOL CALLS:")
+    print(trace["tool_calls"])
+    print("\nGROUNDING:")
+    print(trace["grounding"])
+
+    assert get_tool_names(trace) == ["customer_segments"]
+    assert trace.get("answer_mode") == (
+        "deterministic_structured_fallback"
+    )
+
+    assert_non_empty_answer(trace, question)
+
+    normalized_answer = trace["answer"].replace(",", "")
+
+    for expected_value in [
+        "3218123.84",
+        "36.11",
+        "148",
+        "21744.08"
+    ]:
+        assert expected_value in normalized_answer, (
+            f"Missing fallback fact: {expected_value}"
+        )
+
+    assert trace["grounding"]["checks"][
+        "answer_non_empty"
+    ] is True
+    assert_grounding_passed(trace, question)
+
+    print("PASS")
 
 
 def run_structured_only_case():
@@ -54,7 +297,10 @@ def run_structured_only_case():
     assert tool_names == ["customer_segments"], (
         f"Expected only customer_segments, got {tool_names}"
     )
-    assert trace.get("answer_mode") is None, (
+    assert trace.get("answer_mode") in {
+        None,
+        "deterministic_structured_fallback"
+    }, (
         f"Unexpected answer_mode: {trace.get('answer_mode')}"
     )
 
@@ -132,6 +378,9 @@ def run_rag_only_case():
     assert sources[0]["section"] == "Champions（冠军客户）", (
         f"Unexpected source: {sources[0]}"
     )
+    assert trace["grounding"]["checks"][
+        "general_knowledge_allowed"
+    ] is False
     assert_grounding_passed(trace, question)
 
     print("PASS")
@@ -191,6 +440,9 @@ def run_hybrid_case():
         f"Unexpected source: {sources[0]}"
     )
     assert trace.get("grounding_sanitizer_applied") is None
+    assert trace["grounding"]["checks"][
+        "general_knowledge_allowed"
+    ] is False
     assert_grounding_passed(trace, question)
 
     print("PASS")
@@ -233,7 +485,7 @@ def run_general_suggestions_case():
     assert "不属于当前知识库检索内容" in answer
 
     assert trace["grounding"]["checks"][
-        "rag_evidence_available"
+        "general_knowledge_allowed"
     ] is True
     assert_grounding_passed(trace, question)
 
@@ -285,6 +537,9 @@ def run_phase4_regression_case():
 
 
 def main():
+    run_generic_structured_renderer_case()
+    run_structured_sanitizer_fallback_case()
+    run_structured_empty_answer_fallback_case()
     run_structured_only_case()
     run_rag_only_case()
     run_hybrid_case()
