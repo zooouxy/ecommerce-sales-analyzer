@@ -1,5 +1,6 @@
 import json
 import re
+import time
 
 from src.grounding_validator import GroundingValidator
 from src.structured_fallback_renderer import StructuredFallbackRenderer
@@ -416,6 +417,53 @@ class EcommerceAgent:
 
         return sanitized.strip()
 
+    def _validate_grounding_with_timing(
+        self,
+        answer,
+        trace,
+        allow_general_knowledge
+    ):
+        """执行Grounding校验并记录耗时。"""
+        start = time.perf_counter()
+
+        grounding = self.validator.validate(
+            answer,
+            trace["tool_results"],
+            trace["tool_calls"],
+            allow_general_knowledge=allow_general_knowledge
+        )
+
+        elapsed = round(
+            time.perf_counter() - start,
+            2
+        )
+
+        trace["timing"]["grounding_checks"].append(
+            elapsed
+        )
+
+        print(
+            f"[TIMING] grounding_{len(trace['timing']['grounding_checks'])}: "
+            f"{elapsed:.2f}s"
+        )
+
+        return grounding
+
+    def _finish_trace_timing(self, trace, total_start):
+        """记录整次Agent请求总耗时。"""
+        total_seconds = round(
+            time.perf_counter() - total_start,
+            2
+        )
+
+        trace["timing"]["total_seconds"] = total_seconds
+
+        print(
+            f"[TIMING] total: {total_seconds:.2f}s"
+        )
+
+        return trace
+
     def _get_clarification(self, question):
         """检查月份参数是否缺少年份。"""
         has_year_month = bool(
@@ -471,26 +519,43 @@ class EcommerceAgent:
         return result["answer"]
 
     def ask_with_trace(self, question):
-        """返回最终回答和Agent完整执行轨迹。"""
+        """返回最终回答、执行轨迹和关键环节耗时。"""
+        total_start = time.perf_counter()
+
         question = self._validate_question(question)
 
         clarification = self._get_clarification(question)
 
         if clarification:
-            return {
+            trace = {
                 "question": question,
                 "tool_calls": [],
                 "tool_results": [],
                 "answer": clarification,
-                "grounding": None
+                "grounding": None,
+                "timing": {
+                    "llm_rounds": [],
+                    "tools": [],
+                    "grounding_checks": []
+                }
             }
+
+            return self._finish_trace_timing(
+                trace,
+                total_start
+            )
 
         messages = self._build_messages(question)
 
         trace = {
             "question": question,
             "tool_calls": [],
-            "tool_results": []
+            "tool_results": [],
+            "timing": {
+                "llm_rounds": [],
+                "tools": [],
+                "grounding_checks": []
+            }
         }
 
         successful_tool_cache = {}
@@ -498,10 +563,32 @@ class EcommerceAgent:
             question
         )
 
-        for _ in range(self.max_tool_rounds):
+        for round_index in range(
+            1,
+            self.max_tool_rounds + 1
+        ):
+            llm_start = time.perf_counter()
+
             response = self.provider.chat(
                 messages=messages,
                 tools=self.tools
+            )
+
+            llm_elapsed = round(
+                time.perf_counter() - llm_start,
+                2
+            )
+
+            trace["timing"]["llm_rounds"].append(
+                {
+                    "round": round_index,
+                    "seconds": llm_elapsed
+                }
+            )
+
+            print(
+                f"[TIMING] llm_round_{round_index}: "
+                f"{llm_elapsed:.2f}s"
             )
 
             message = response.choices[0].message
@@ -520,11 +607,10 @@ class EcommerceAgent:
                             "deterministic_structured_fallback"
                         )
 
-                grounding = self.validator.validate(
+                grounding = self._validate_grounding_with_timing(
                     answer,
-                    trace["tool_results"],
-                    trace["tool_calls"],
-                    allow_general_knowledge=allow_general_knowledge
+                    trace,
+                    allow_general_knowledge
                 )
 
                 sanitized_answer = self._sanitize_grounding_answer(
@@ -534,12 +620,13 @@ class EcommerceAgent:
 
                 if sanitized_answer != answer:
                     answer = sanitized_answer
-                    grounding = self.validator.validate(
+
+                    grounding = self._validate_grounding_with_timing(
                         answer,
-                        trace["tool_results"],
-                        trace["tool_calls"],
-                        allow_general_knowledge=allow_general_knowledge
+                        trace,
+                        allow_general_knowledge
                     )
+
                     trace["grounding_sanitizer_applied"] = True
 
                 normalized_answer = self._normalize_general_suggestions_answer(
@@ -549,12 +636,13 @@ class EcommerceAgent:
 
                 if normalized_answer != answer:
                     answer = normalized_answer
-                    grounding = self.validator.validate(
+
+                    grounding = self._validate_grounding_with_timing(
                         answer,
-                        trace["tool_results"],
-                        trace["tool_calls"],
-                        allow_general_knowledge=allow_general_knowledge
+                        trace,
+                        allow_general_knowledge
                     )
+
                     trace["provenance_normalization_applied"] = True
 
                 # 后处理可能把原本非空的LLM回答整段删除。
@@ -569,17 +657,20 @@ class EcommerceAgent:
                         trace["answer_mode"] = (
                             "deterministic_structured_fallback"
                         )
-                        grounding = self.validator.validate(
+
+                        grounding = self._validate_grounding_with_timing(
                             answer,
-                            trace["tool_results"],
-                            trace["tool_calls"],
-                            allow_general_knowledge=allow_general_knowledge
+                            trace,
+                            allow_general_knowledge
                         )
 
                 trace["answer"] = answer
                 trace["grounding"] = grounding
 
-                return trace
+                return self._finish_trace_timing(
+                    trace,
+                    total_start
+                )
 
             assistant_tool_calls = []
             parsed_calls = []
@@ -624,9 +715,28 @@ class EcommerceAgent:
                 if signature in successful_tool_cache:
                     tool_result = successful_tool_cache[signature]
                 else:
+                    tool_start = time.perf_counter()
+
                     tool_result = run_tool(
                         tool_name,
                         arguments
+                    )
+
+                    tool_elapsed = round(
+                        time.perf_counter() - tool_start,
+                        2
+                    )
+
+                    trace["timing"]["tools"].append(
+                        {
+                            "name": tool_name,
+                            "seconds": tool_elapsed
+                        }
+                    )
+
+                    print(
+                        f"[TIMING] tool:{tool_name}: "
+                        f"{tool_elapsed:.2f}s"
                     )
 
                     trace["tool_calls"].append(
@@ -664,15 +774,19 @@ class EcommerceAgent:
 
             if deterministic_hybrid_answer is not None:
                 trace["answer"] = deterministic_hybrid_answer
-                trace["grounding"] = self.validator.validate(
+
+                trace["grounding"] = self._validate_grounding_with_timing(
                     deterministic_hybrid_answer,
-                    trace["tool_results"],
-                    trace["tool_calls"],
-                    allow_general_knowledge=allow_general_knowledge
+                    trace,
+                    allow_general_knowledge
                 )
+
                 trace["answer_mode"] = "deterministic_hybrid"
 
-                return trace
+                return self._finish_trace_timing(
+                    trace,
+                    total_start
+                )
 
             deterministic_rag_answer = self._get_deterministic_rag_answer(
                 question,
@@ -681,15 +795,46 @@ class EcommerceAgent:
 
             if deterministic_rag_answer is not None:
                 trace["answer"] = deterministic_rag_answer
-                trace["grounding"] = self.validator.validate(
+
+                trace["grounding"] = self._validate_grounding_with_timing(
                     deterministic_rag_answer,
-                    trace["tool_results"],
-                    trace["tool_calls"],
-                    allow_general_knowledge=allow_general_knowledge
+                    trace,
+                    allow_general_knowledge
                 )
+
                 trace["answer_mode"] = "deterministic_rag"
 
-                return trace
+                return self._finish_trace_timing(
+                    trace,
+                    total_start
+                )
+
+            deterministic_structured_answer = (
+                self._get_structured_fallback_answer(
+                    trace
+                )
+            )
+
+            if deterministic_structured_answer is not None:
+                trace["answer"] = deterministic_structured_answer
+
+                trace["grounding"] = self._validate_grounding_with_timing(
+                    deterministic_structured_answer,
+                    trace,
+                    allow_general_knowledge
+                )
+
+                trace["answer_mode"] = "deterministic_structured"
+
+                return self._finish_trace_timing(
+                    trace,
+                    total_start
+                )
+
+        self._finish_trace_timing(
+            trace,
+            total_start
+        )
 
         raise RuntimeError(
             "Agent exceeded maximum tool call rounds"

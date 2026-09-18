@@ -49,6 +49,30 @@ def normalize_year_month(text):
     )
 
 
+def normalize_number(value):
+    """
+    Normalize numeric values for grounding comparison.
+
+    Examples:
+    534.40 -> 534.4
+    3218123.8399999999 -> 3218123.84
+    """
+
+    try:
+        number = float(value)
+
+        if number.is_integer():
+            return str(int(number))
+
+        return (
+            f"{number:.2f}"
+            .rstrip("0")
+            .rstrip(".")
+        )
+
+    except Exception:
+        return value
+
 def extract_numbers(text):
     """提取文本中的数字并标准化格式。"""
     if not isinstance(text, str):
@@ -63,7 +87,7 @@ def extract_numbers(text):
     )
 
     return {
-        number.replace(",", "")
+        normalize_number(number.replace(",", ""))
         for number in numbers
     }
 
@@ -76,7 +100,7 @@ def collect_evidence_numbers(value, key=None):
         return numbers
 
     if isinstance(value, (int, float)):
-        numbers.add(str(value))
+        numbers.add(normalize_number(str(value)))
         return numbers
 
     if isinstance(value, str):

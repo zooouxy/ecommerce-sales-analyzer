@@ -112,6 +112,32 @@ class SanitizedToEmptyProvider:
         )
 
 
+def bypass_structured_fast_path_once(agent):
+    """
+    测试辅助：仅第一次绕过deterministic structured fast path。
+
+    这样可以让测试真正进入第二轮LLM，再分别验证：
+    1. Sanitizer清空后的deterministic fallback；
+    2. LLM空回答后的deterministic fallback。
+
+    第二次调用StructuredFallback时恢复真实Renderer，
+    因此不会削弱fallback本身的测试覆盖。
+    """
+    original = agent._get_structured_fallback_answer
+    call_count = 0
+
+    def wrapped(trace):
+        nonlocal call_count
+        call_count += 1
+
+        if call_count == 1:
+            return None
+
+        return original(trace)
+
+    agent._get_structured_fallback_answer = wrapped
+
+
 def run_generic_structured_renderer_case():
     """验证Fallback不再只支持customer_segments专用模板。"""
     renderer = StructuredFallbackRenderer()
@@ -186,6 +212,7 @@ def run_structured_sanitizer_fallback_case():
     fallback_agent = EcommerceAgent(
         provider=SanitizedToEmptyProvider()
     )
+    bypass_structured_fast_path_once(fallback_agent)
 
     print("=" * 70)
     print("CASE: Structured Sanitizer Empty Fallback")
@@ -233,6 +260,7 @@ def run_structured_empty_answer_fallback_case():
     fallback_agent = EcommerceAgent(
         provider=EmptyFinalAnswerProvider()
     )
+    bypass_structured_fast_path_once(fallback_agent)
 
     print("=" * 70)
     print("CASE: Structured Empty Answer Fallback")
@@ -299,6 +327,7 @@ def run_structured_only_case():
     )
     assert trace.get("answer_mode") in {
         None,
+        "deterministic_structured",
         "deterministic_structured_fallback"
     }, (
         f"Unexpected answer_mode: {trace.get('answer_mode')}"

@@ -59,7 +59,10 @@ class SiliconFlowProvider(LLMProvider):
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "temperature": 0
+            "temperature": 0,
+            "extra_body": {
+                "enable_thinking": False
+            }
         }
 
         converted_tools = self._convert_tools(tools)

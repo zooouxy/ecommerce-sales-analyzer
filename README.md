@@ -87,8 +87,8 @@
 ### 系统架构图
 
 <p align="center">
-  <a href="docs/images/system_architecture_cn.svg">
-  <img src="docs/images/system_architecture_cn.svg" alt="AI 电商数据分析与智能决策系统架构图" width="100%">
+  <a href="docs/images/01_system_architecture_cn.png">
+  <img src="docs/images/01_system_architecture_cn.png" alt="AI 电商数据分析与智能决策系统架构图" width="100%">
   </a>
 </p>
 
@@ -129,7 +129,7 @@
 智能分析助手 页面会展示：
 
 ```text
-回答模式
+回答策略
 工具调用记录
 工具返回结果
 事实依据校验
@@ -165,8 +165,8 @@
 #### 执行概览
 
 <p align="center">
-  <a href="docs/images/overview.png">
-  <img src="docs/images/overview.png" alt="Executive Overview 销售执行概览" width="100%">
+  <a href="docs/images/02_overview.png">
+  <img src="docs/images/02_overview.png" alt="Executive Overview 销售执行概览" width="100%">
   </a>
 </p>
 
@@ -175,8 +175,8 @@
 #### 商品分析
 
 <p align="center">
-  <a href="docs/images/product_analysis.png">
-  <img src="docs/images/product_analysis.png" alt="Product Analysis 商品分析" width="100%">
+  <a href="docs/images/03_product_analysis.png">
+  <img src="docs/images/03_product_analysis.png" alt="Product Analysis 商品分析" width="100%">
   </a>
 </p>
 
@@ -185,8 +185,8 @@
 #### 客户分析
 
 <p align="center">
-  <a href="docs/images/customer_analysis.png">
-  <img src="docs/images/customer_analysis.png" alt="Customer Analysis 客户分析" width="100%">
+  <a href="docs/images/04_customer_analysis.png">
+  <img src="docs/images/04_customer_analysis.png" alt="Customer Analysis 客户分析" width="100%">
   </a>
 </p>
 
@@ -194,35 +194,65 @@
 
 ### AI Analyst 演示
 
-#### 结构化事实问答
+#### AI Analyst 页面与示例问题
 
 <p align="center">
-  <a href="docs/images/ai_structured.png">
-  <img src="docs/images/ai_structured.png" alt="AI Analyst 结构化事实问答" width="100%">
+  <a href="docs/images/05_ai_analyst_overview.png">
+  <img src="docs/images/05_ai_analyst_overview.png" alt="AI Analyst 页面与示例问题" width="100%">
   </a>
 </p>
 
-<p align="center"><em>图 5｜结构化事实问答：Agent 调用客户分群工具，并基于结构化结果返回确定性事实。</em></p>
+<p align="center"><em>图 5｜AI Analyst 页面：按 Structured Analytics、RAG Knowledge、Hybrid Analysis 和 General Knowledge 四类场景组织示例问题，便于快速体验系统不同回答路径。</em></p>
+
+#### 结构化事实问答
+
+<p align="center">
+  <a href="docs/images/06_ai_structured.png">
+  <img src="docs/images/06_ai_structured.png" alt="AI Analyst 结构化事实问答" width="100%">
+  </a>
+</p>
+
+<p align="center"><em>图 6｜结构化事实问答：Agent 调用 customer_segments，并通过 deterministic_structured 路径返回结构化事实。</em></p>
+
+#### RAG 知识问答
+
+<p align="center">
+  <a href="docs/images/07_ai_rag.png">
+  <img src="docs/images/07_ai_rag.png" alt="AI Analyst RAG 知识问答" width="100%">
+  </a>
+</p>
+
+<p align="center"><em>图 7｜RAG 知识问答：Agent 调用 business_knowledge_search，并通过 deterministic_rag 返回知识库运营建议。</em></p>
 
 #### 结构化数据 + RAG 混合问答
 
 <p align="center">
-  <a href="docs/images/ai_hybrid.png">
-  <img src="docs/images/ai_hybrid.png" alt="AI Analyst 结构化数据与 RAG 混合问答" width="100%">
+  <a href="docs/images/08_ai_hybrid.png">
+  <img src="docs/images/08_ai_hybrid.png" alt="AI Analyst 结构化数据与 RAG 混合问答" width="100%">
   </a>
 </p>
 
-<p align="center"><em>图 6｜混合问答：同一问题中组合客户分群结构化数据与知识库运营建议。</em></p>
+<p align="center"><em>图 8｜混合问答：同一问题中组合客户分群结构化数据与知识库运营建议，并通过 deterministic_hybrid 返回结果。</em></p>
+
+#### 通用建议（非知识库内容）
+
+<p align="center">
+  <a href="docs/images/09_ai_general_suggestions.png">
+  <img src="docs/images/09_ai_general_suggestions.png" alt="AI Analyst 通用建议与来源标注" width="100%">
+  </a>
+</p>
+
+<p align="center"><em>图 9｜通用建议：用户明确请求知识库之外的建议时，模型生成内容会被显式标注为“非知识库内容”；端到端延迟包含外部 LLM Provider 的网络与推理等待时间。</em></p>
 
 #### Agent 执行轨迹
 
 <p align="center">
-  <a href="docs/images/ai_trace.png">
-  <img src="docs/images/ai_trace.png" alt="AI Analyst Agent Trace 执行轨迹" width="55%">
+  <a href="docs/images/10_ai_trace.png">
+  <img src="docs/images/10_ai_trace.png" alt="AI Analyst Agent Trace 执行轨迹" width="55%">
   </a>
 </p>
 
-<p align="center"><em>图 7｜Agent 执行轨迹：展示 deterministic_hybrid 回答模式，以及 customer_segments 与 business_knowledge_search 两类工具调用。</em></p>
+<p align="center"><em>图 10｜Agent 执行轨迹：展示 Answer Strategy、Tool Calls、Grounding Validation 和端到端执行信息。</em></p>
 
 ---
 
@@ -267,7 +297,7 @@ Streamlit
 ✅ 已完成
 
 阶段 6 — 作品集包装与演示
-🟡 进行中
+✅ 已完成
 ```
 
 详细实现文档：
@@ -451,7 +481,7 @@ Champions客户贡献了多少收入？
 交互式页面同时展示：
 
 ```text
-回答模式
+回答策略
 工具调用记录
 工具返回结果
 事实依据校验
@@ -639,13 +669,27 @@ revenue_percentage_difference_pp
 
 这样可以避免重复调用浪费 智能体 工具 Round。
 
-为了提高事实型回答稳定性，SiliconFlow 模型服务层 当前使用：
+## 响应性能与外部模型延迟
+
+系统会在 Agent Trace 中记录大语言模型轮次、工具执行、事实依据校验和端到端总耗时。
+
+当前性能特征是：
+
+- SQLite / Query Service、知识检索和 Grounding 通常只占较小部分延迟
+- Structured、RAG 和 Hybrid 场景在可以确定性表达时会直接使用确定性回答路径，避免不必要的第二次大语言模型调用
+- 需要自由生成的通用建议仍会经过额外的大语言模型轮次，因此端到端延迟会受到外部模型服务的网络与推理时间影响
+- 外部模型服务延迟可能在不同请求之间波动，因此单次 Total Latency 不等同于本地分析链路耗时
+
+这种设计优先减少项目内部可控的重复计算与大语言模型调用，而不是把外部模型服务的瞬时延迟隐藏起来。
+
+为了提高事实型回答稳定性并降低不必要的推理延迟，SiliconFlow 模型服务层 当前使用：
 
 ```text
 temperature = 0
+enable_thinking = False
 ```
 
-这会降低输出波动，但不能替代 事实依据校验。
+`temperature = 0` 用于降低输出波动；`enable_thinking = False` 用于避免当前工具调用场景中的额外思维链推理开销。两者都不能替代 事实依据校验。
 
 ---
 
@@ -697,9 +741,10 @@ SiliconFlow
 
 ```text
 temperature = 0
+enable_thinking = False
 ```
 
-用于减少不必要的回答波动。
+其中 `temperature = 0` 用于减少不必要的回答波动，`enable_thinking = False` 用于降低工具调用场景中的额外推理等待。
 
 ---
 
@@ -905,6 +950,7 @@ python-dotenv==1.2.1
 - 当前分析工具没有暴露币种元数据
 - 因此金额应只显示数值，不自行假设货币单位
 - 大语言模型 工具调用 和自然语言生成仍然具有概率性
+- 外部大语言模型服务的网络与推理延迟可能波动；Total Latency 包含这部分外部等待时间
 - `temperature=0` 会降低波动，但不代表数学意义上的完全确定
 - 当前交互式页面保存的是 界面层聊天历史，智能体 尚未维护跨问题的完整对话记忆
 - 超大型复合查询可能超过当前 智能体 配置的最大 工具调用 轮数
@@ -943,7 +989,7 @@ docs/zh/阶段4_Advanced_Analytics_CN.md
 ✅ 已完成
 
 阶段 6 — 作品集包装与演示
-🟡 进行中
+✅ 已完成
 ```
 
 ---
@@ -1033,7 +1079,7 @@ The Agent cannot bypass the Tool Layer and Query Service.
 ### System Architecture Diagram
 
 <p align="center">
-  <img src="docs/images/system_architecture_cn.svg" alt="AI Ecommerce Analytics and Decision System Architecture" width="100%">
+  <img src="docs/images/01_system_architecture_cn.svg" alt="AI Ecommerce Analytics and Decision System Architecture" width="100%">
 </p>
 
 <p align="center"><em>Figure 1 | End-to-end architecture covering the Streamlit frontend, Agent orchestration, structured analytics tools, RAG knowledge augmentation, Query Service, SQL analytical views, and SQLite data layer.</em></p>
@@ -1073,7 +1119,7 @@ The Grounding layer checks tool execution, unsupported numbers, unsupported curr
 The AI Analyst UI exposes:
 
 ```text
-Answer Mode
+Answer Strategy
 Tool Calls
 Tool Results
 Grounding Validation
@@ -1109,7 +1155,7 @@ Together, these scenarios show deterministic analytics, retrieval, hybrid reason
 #### Executive Overview
 
 <p align="center">
-  <img src="docs/images/overview.png" alt="Executive Overview dashboard" width="100%">
+  <img src="docs/images/02_overview.png" alt="Executive Overview dashboard" width="100%">
 </p>
 
 <p align="center"><em>Figure 2 | Executive overview with core sales KPIs and monthly revenue trend.</em></p>
@@ -1117,7 +1163,7 @@ Together, these scenarios show deterministic analytics, retrieval, hybrid reason
 #### Product Analysis
 
 <p align="center">
-  <img src="docs/images/product_analysis.png" alt="Product Analysis dashboard" width="100%">
+  <img src="docs/images/03_product_analysis.png" alt="Product Analysis dashboard" width="100%">
 </p>
 
 <p align="center"><em>Figure 3 | Product analysis with product revenue, Top 10 revenue contribution, and revenue concentration.</em></p>
@@ -1125,36 +1171,60 @@ Together, these scenarios show deterministic analytics, retrieval, hybrid reason
 #### Customer Analysis
 
 <p align="center">
-  <img src="docs/images/customer_analysis.png" alt="Customer Analysis dashboard" width="100%">
+  <img src="docs/images/04_customer_analysis.png" alt="Customer Analysis dashboard" width="100%">
 </p>
 
 <p align="center"><em>Figure 4 | Customer analysis with RFM segments, customer distribution, and segment revenue contribution.</em></p>
 
 ### AI Analyst Demo
 
+#### AI Analyst Overview & Example Questions
+
+<p align="center">
+  <img src="docs/images/05_ai_analyst_overview.png" alt="AI Analyst overview and example questions" width="100%">
+</p>
+
+<p align="center"><em>Figure 5 | AI Analyst landing view with example questions grouped into Structured Analytics, RAG Knowledge, Hybrid Analysis, and General Knowledge scenarios.</em></p>
+
 #### Structured Fact Question
 
 <p align="center">
-  <img src="docs/images/ai_structured.png" alt="AI Analyst structured fact question" width="100%">
+  <img src="docs/images/06_ai_structured.png" alt="AI Analyst structured fact question" width="100%">
 </p>
 
-<p align="center"><em>Figure 5 | Structured fact workflow: the Agent calls the customer-segment tool and returns facts grounded in structured results.</em></p>
+<p align="center"><em>Figure 6 | Structured fact workflow: the Agent calls customer_segments and returns structured facts through the deterministic_structured path.</em></p>
+
+#### RAG Knowledge Question
+
+<p align="center">
+  <img src="docs/images/07_ai_rag.png" alt="AI Analyst RAG knowledge question" width="100%">
+</p>
+
+<p align="center"><em>Figure 7 | RAG workflow: the Agent calls business_knowledge_search and returns retrieved operational guidance through deterministic_rag.</em></p>
 
 #### Structured Data + RAG Hybrid
 
 <p align="center">
-  <img src="docs/images/ai_hybrid.png" alt="AI Analyst structured data and RAG hybrid answer" width="100%">
+  <img src="docs/images/08_ai_hybrid.png" alt="AI Analyst structured data and RAG hybrid answer" width="100%">
 </p>
 
-<p align="center"><em>Figure 6 | Hybrid answer combining structured customer-segment facts with retrieved operational guidance.</em></p>
+<p align="center"><em>Figure 8 | Hybrid answer combining structured customer-segment facts with retrieved operational guidance through deterministic_hybrid.</em></p>
+
+#### General Suggestions (Non-Knowledge-Base Content)
+
+<p align="center">
+  <img src="docs/images/09_ai_general_suggestions.png" alt="AI Analyst general suggestions with provenance" width="100%">
+</p>
+
+<p align="center"><em>Figure 9 | General suggestions are explicitly labeled as non-knowledge-base content when the user requests advice beyond retrieved knowledge. Total latency includes external LLM provider network and inference time.</em></p>
 
 #### Agent Execution Trace
 
 <p align="center">
-  <img src="docs/images/ai_trace.png" alt="AI Analyst Agent execution trace" width="55%">
+  <img src="docs/images/10_ai_trace.png" alt="AI Analyst Agent execution trace" width="55%">
 </p>
 
-<p align="center"><em>Figure 7 | Agent trace showing deterministic_hybrid mode and the customer_segments plus business_knowledge_search tool calls.</em></p>
+<p align="center"><em>Figure 10 | Agent trace exposing Answer Strategy, Tool Calls, Grounding Validation, and end-to-end execution information.</em></p>
 
 ---
 
@@ -1199,7 +1269,7 @@ Phase 5 — Structured Data + RAG Hybrid
 ✅ Complete
 
 Phase 6 — Portfolio Packaging & Demo
-🟡 In Progress
+✅ Complete
 ```
 
 Detailed implementation documentation:
@@ -1383,7 +1453,7 @@ General model suggestions with explicit provenance
 The Streamlit interface exposes:
 
 ```text
-Answer Mode
+Answer Strategy
 Tool Calls
 Tool Results
 Grounding Validation
@@ -1571,13 +1641,27 @@ same tool
 
 This prevents redundant calls from consuming unnecessary Agent rounds.
 
-For more stable factual generation, the SiliconFlow provider uses:
+## Response Performance & External LLM Latency
+
+The Agent Trace records LLM rounds, tool execution, Grounding checks, and total end-to-end latency.
+
+Current performance characteristics:
+
+- SQLite / Query Service work, local retrieval, and Grounding usually account for only a small part of total latency
+- Structured, RAG, and Hybrid scenarios use deterministic answer paths whenever the returned evidence can be rendered directly, avoiding an unnecessary second LLM call
+- General suggestions still require free-form model generation and may therefore include an additional LLM round
+- End-to-end latency can vary with the external LLM provider's network and inference time, so a single Total Latency value should not be interpreted as local analytics execution time
+
+The design optimizes the parts controlled by the application—duplicate tool execution, unnecessary LLM rounds, and deterministic rendering—without hiding external provider latency.
+
+For more stable factual generation and lower avoidable tool-calling latency, the SiliconFlow provider uses:
 
 ```text
 temperature = 0
+enable_thinking = False
 ```
 
-This reduces output variability but does not replace Grounding Validation.
+`temperature = 0` reduces output variability, while `enable_thinking = False` avoids unnecessary extended reasoning in the current tool-calling workflow. Neither replaces Grounding Validation.
 
 ---
 
@@ -1629,9 +1713,10 @@ The current factual-generation configuration uses:
 
 ```text
 temperature = 0
+enable_thinking = False
 ```
 
-to reduce unnecessary response variance.
+to reduce unnecessary response variance and avoid extended reasoning overhead in the current tool-calling workflow.
 
 ---
 
@@ -1829,6 +1914,7 @@ Known limitations include:
 - Currency metadata is not currently exposed by analytical tools
 - Monetary values should therefore be displayed without inventing a currency
 - LLM Tool Calling and natural-language generation remain probabilistic
+- External LLM provider network and inference latency can vary; Total Latency includes this external waiting time
 - `temperature=0` reduces variance but does not make generation mathematically deterministic
 - Streamlit chat history is UI-level history; the Agent does not yet maintain full cross-question conversational memory
 - Very large compound requests may exceed the configured maximum number of Agent tool rounds
@@ -1869,7 +1955,7 @@ Phase 5 — Structured Data + RAG Hybrid
 ✅ Complete
 
 Phase 6 — Portfolio Packaging & Demo
-⬜ Planned
+✅ Complete
 ```
 
 ---

@@ -81,16 +81,10 @@ def load_customer_value(limit=None, customer_id=None):
 
 
 def render_sidebar():
-    """渲染侧边栏导航和项目说明。"""
-    st.sidebar.title("📊 AI Ecommerce Analyst")
-    st.sidebar.caption(
-        "Interactive ecommerce analytics powered by "
-        "structured data and an AI Agent."
-    )
+    """渲染侧边栏导航。"""
+    st.sidebar.title("AI Ecommerce Analyst")
 
-    st.sidebar.divider()
-
-    page = st.sidebar.radio(
+    return st.sidebar.radio(
         "Navigation",
         [
             "Executive Overview",
@@ -100,36 +94,12 @@ def render_sidebar():
         ]
     )
 
-    st.sidebar.divider()
-
-    st.sidebar.markdown("**Analytics Architecture**")
-    st.sidebar.caption(
-        "Streamlit → Query Service → SQL / SQLite"
-    )
-    st.sidebar.caption(
-        "AI Analyst → Tools → Query Service → SQL / SQLite"
-    )
-
-    monthly_df = load_monthly_sales()
-
-    if not monthly_df.empty:
-        start_month = monthly_df["month"].min().strftime("%Y-%m")
-        end_month = monthly_df["month"].max().strftime("%Y-%m")
-
-        st.sidebar.markdown("**Data Coverage**")
-        st.sidebar.caption(
-            f"{start_month} → {end_month}"
-        )
-
-    return page
-
 
 def render_executive_overview():
     """渲染销售概览页面。"""
     st.title("Executive Overview")
     st.caption(
-        "High-level ecommerce performance, order activity, "
-        "and monthly revenue trends."
+        "Core ecommerce sales performance and monthly trends."
     )
 
     kpi = load_sales_kpi()
@@ -158,16 +128,13 @@ def render_executive_overview():
 
     st.divider()
 
+    st.subheader("Monthly Revenue Trend")
+
     monthly_df = load_monthly_sales()
 
     if monthly_df.empty:
         st.info("No monthly sales data available.")
         return
-
-    st.subheader("Monthly Revenue Trend")
-    st.caption(
-        "Revenue performance across the available transaction period."
-    )
 
     revenue_chart = monthly_df.set_index(
         "month"
@@ -178,7 +145,7 @@ def render_executive_overview():
         use_container_width=True
     )
 
-    st.subheader("Monthly Sales Details")
+    st.subheader("Monthly Sales Data")
 
     display_df = monthly_df.copy()
 
@@ -210,15 +177,6 @@ def render_executive_overview():
         )
     )
 
-    display_df = display_df.rename(
-        columns={
-            "month": "Month",
-            "revenue": "Revenue",
-            "orders": "Orders",
-            "revenue_growth_pct": "Revenue Growth"
-        }
-    )
-
     st.dataframe(
         display_df,
         use_container_width=True,
@@ -230,8 +188,7 @@ def render_product_analysis():
     """渲染商品分析页面。"""
     st.title("Product Analysis")
     st.caption(
-        "Explore product revenue, sales volume, ranking, "
-        "and revenue concentration."
+        "Product performance, ranking, and revenue concentration."
     )
 
     concentration = load_product_concentration()
@@ -255,10 +212,7 @@ def render_product_analysis():
 
     st.divider()
 
-    st.subheader("Top 10 Products by Revenue")
-    st.caption(
-        "Highest-revenue products ranked by StockCode."
-    )
+    st.subheader("Top Products by Revenue")
 
     top_products_df = load_product_performance(
         limit=10
@@ -292,23 +246,13 @@ def render_product_analysis():
         display_df["quantity"] = display_df[
             "quantity"
         ].map(
-            lambda value: f"{int(value):,}"
+            lambda value: f"{value:,}"
         )
 
         display_df["orders"] = display_df[
             "orders"
         ].map(
-            lambda value: f"{int(value):,}"
-        )
-
-        display_df = display_df.rename(
-            columns={
-                "stock_code": "StockCode",
-                "description": "Description",
-                "revenue": "Revenue",
-                "quantity": "Quantity",
-                "orders": "Orders"
-            }
+            lambda value: f"{value:,}"
         )
 
         st.dataframe(
@@ -320,12 +264,9 @@ def render_product_analysis():
     st.divider()
 
     st.subheader("Product Lookup")
-    st.caption(
-        "Enter a StockCode to inspect one product in detail."
-    )
 
     stock_code = st.text_input(
-        "StockCode",
+        "Enter StockCode",
         placeholder="e.g. 22423"
     ).strip()
 
@@ -346,10 +287,6 @@ def render_product_analysis():
                 f"### {product['description']}"
             )
 
-            st.caption(
-                f"StockCode: {product['stock_code']}"
-            )
-
             p1, p2, p3 = st.columns(3)
 
             p1.metric(
@@ -367,13 +304,17 @@ def render_product_analysis():
                 f"{int(product['orders']):,}"
             )
 
+            st.caption(
+                f"StockCode: {product['stock_code']}"
+            )
+
 
 def render_customer_analysis():
     """渲染客户分析页面。"""
     st.title("Customer Analysis")
     st.caption(
-        "Understand customer segmentation, revenue contribution, "
-        "and individual customer value."
+        "Customer segmentation, value contribution, "
+        "and individual customer lookup."
     )
 
     segments_df = load_customer_segments()
@@ -400,25 +341,29 @@ def render_customer_analysis():
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric(
-        "Total Customers",
-        f"{total_customers:,}"
-    )
+    with col1:
+        st.caption("Total Customers")
+        st.markdown(
+            f"#### {total_customers:,}"
+        )
 
-    col2.metric(
-        "Segment Revenue",
-        f"{total_segment_revenue:,.2f}"
-    )
+    with col2:
+        st.caption("Segment Revenue")
+        st.markdown(
+            f"#### {total_segment_revenue:,.2f}"
+        )
 
-    col3.metric(
-        "Largest Segment",
-        largest_segment["segment"]
-    )
+    with col3:
+        st.caption("Largest Segment")
+        st.markdown(
+            f"#### {largest_segment['segment']}"
+        )
 
-    col4.metric(
-        "Highest Revenue Segment",
-        highest_revenue_segment["segment"]
-    )
+    with col4:
+        st.caption("Highest Revenue Segment")
+        st.markdown(
+            f"#### {highest_revenue_segment['segment']}"
+        )
 
     st.divider()
 
@@ -426,9 +371,6 @@ def render_customer_analysis():
 
     with chart_col1:
         st.subheader("Customers by Segment")
-        st.caption(
-            "Customer distribution across RFM segments."
-        )
 
         customer_chart = segments_df[
             [
@@ -446,9 +388,6 @@ def render_customer_analysis():
 
     with chart_col2:
         st.subheader("Revenue by Segment")
-        st.caption(
-            "Revenue contribution from each customer segment."
-        )
 
         revenue_chart = segments_df[
             [
@@ -494,16 +433,6 @@ def render_customer_analysis():
         lambda value: f"{value:,.2f}"
     )
 
-    display_df = display_df.rename(
-        columns={
-            "segment": "Segment",
-            "customer_count": "Customers",
-            "total_revenue": "Revenue",
-            "revenue_percentage": "Revenue Share",
-            "average_revenue_per_customer": "Avg Revenue / Customer"
-        }
-    )
-
     st.dataframe(
         display_df,
         use_container_width=True,
@@ -513,12 +442,9 @@ def render_customer_analysis():
     st.divider()
 
     st.subheader("Customer Lookup")
-    st.caption(
-        "Enter a Customer ID to inspect customer-level value metrics."
-    )
 
     customer_id_text = st.text_input(
-        "Customer ID",
+        "Enter Customer ID",
         placeholder="e.g. 14646"
     ).strip()
 
@@ -572,126 +498,110 @@ def render_customer_analysis():
                 f"{customer['average_order_value']:,.2f}"
             )
 
-            st.caption(
-                f"Purchase period: "
-                f"{customer['first_purchase_date']} "
-                f"→ {customer['last_purchase_date']}"
+            st.write(
+                "First Purchase:",
+                customer["first_purchase_date"]
+            )
+
+            st.write(
+                "Last Purchase:",
+                customer["last_purchase_date"]
             )
 
 
 def render_agent_trace(trace):
-    """渲染Agent执行轨迹、回答模式和知识来源。"""
+    """渲染适合作品集展示的Agent执行轨迹。"""
     with st.expander(
-        "Agent Trace",
+        "Agent Execution Trace",
         expanded=False
     ):
-        tool_calls = trace.get(
-            "tool_calls",
-            []
+        tool_calls = trace.get("tool_calls", [])
+        tool_results = trace.get("tool_results", [])
+        grounding = trace.get("grounding")
+        timing = trace.get("timing", {})
+
+        answer_mode = trace.get("answer_mode") or "llm_generated"
+        tool_names = [
+            item.get("name")
+            for item in tool_calls
+            if item.get("name")
+        ]
+        tools_display = (
+            ", ".join(dict.fromkeys(tool_names))
+            if tool_names
+            else "None"
+        )
+        grounding_display = (
+            "PASS"
+            if grounding and grounding.get("passed")
+            else "CHECK"
+            if grounding
+            else "N/A"
+        )
+        total_seconds = timing.get("total_seconds")
+        latency_display = (
+            f"{total_seconds:.2f}s"
+            if isinstance(total_seconds, (int, float))
+            else "N/A"
         )
 
-        tool_results = trace.get(
-            "tool_results",
-            []
-        )
+        c1, c2, c3, c4 = st.columns(4)
 
-        grounding = trace.get(
-            "grounding"
-        )
+        with c1:
+            st.caption("Answer Strategy")
+            st.markdown(f"#### {answer_mode}")
 
-        answer_mode = trace.get(
-            "answer_mode"
-        )
+        with c2:
+            st.caption("Tools Used")
+            st.markdown(f"#### {len(tool_names)}")
 
-        st.markdown("#### Answer Mode")
+        with c3:
+            st.caption("Grounding")
+            st.markdown(f"#### {grounding_display}")
 
-        if answer_mode:
-            st.code(
-                answer_mode,
-                language=None
-            )
-        else:
-            st.caption(
-                "LLM synthesis with grounded tool evidence."
-            )
+        with c4:
+            st.caption("Total Latency")
+            st.markdown(f"#### {latency_display}")
+
+        if tool_names:
+            st.caption(f"Tools: {tools_display}")
 
         st.markdown("#### Tool Calls")
 
         if tool_calls:
             st.json(tool_calls)
         else:
-            st.caption(
-                "No analytical tool call was required."
-            )
+            st.caption("No analytical tool call was required.")
 
         st.markdown("#### Tool Results")
 
         if tool_results:
             st.json(tool_results)
         else:
-            st.caption(
-                "No tool result was returned."
-            )
+            st.caption("No tool result was returned.")
 
         st.markdown("#### Grounding Validation")
 
         if grounding is None:
-            st.caption(
-                "Grounding validation was not required."
-            )
+            st.caption("Grounding validation was not required.")
             return
 
-        if grounding["passed"]:
-            st.success(
-                "Grounding validation passed."
-            )
+        if grounding.get("passed"):
+            st.success("Grounding validation passed.")
         else:
             st.warning(
                 "Grounding validation returned warnings. "
                 "Review the evidence below."
             )
 
-        retrieved_sources = grounding.get(
-            "retrieved_sources",
-            []
-        )
-
-        if retrieved_sources:
-            st.markdown("#### Knowledge Sources")
-
-            for source in retrieved_sources:
-                source_file = source.get(
-                    "source_file",
-                    "Unknown source"
-                )
-                section = source.get(
-                    "section",
-                    "Unknown section"
-                )
-                language = source.get(
-                    "language",
-                    "unknown"
-                )
-                domain = source.get(
-                    "domain",
-                    "unknown"
-                )
-
-                st.markdown(
-                    f"- **{source_file}** — {section}  \\n"
-                    f"  `{language}` · `{domain}`"
-                )
-
         st.json(grounding)
-
-
 def render_ai_analyst():
-    """渲染AI Analyst对话页面。"""
+    """渲染AI Analyst作品集演示页面。"""
     st.title("AI Analyst")
     st.caption(
         "Ask ecommerce business questions in natural language. "
-        "The Agent combines structured analytics, retrieved business "
-        "knowledge, and grounded answer generation."
+        "The Agent can combine structured analytics, business "
+        "knowledge retrieval, and grounding validation."
     )
 
     with st.expander(
@@ -700,11 +610,20 @@ def render_ai_analyst():
     ):
         st.markdown(
             """
-- 2011年11月销售情况怎么样？
-- 商品22423的销售表现怎么样？
+**📊 Structured Analytics**
+
 - Champions客户贡献了多少收入？
+
+**📚 RAG Knowledge**
+
 - Champions客户应该怎么运营？
+
+**🔀 Hybrid Analysis**
+
 - Champions客户贡献了多少收入，并且应该怎么运营？
+
+**💡 General Knowledge**
+
 - 除了知识库里的策略，还有哪些通用运营建议？
 """
         )
@@ -780,10 +699,10 @@ def render_ai_analyst():
                     }
                 )
 
-            except Exception:
+            except Exception as error:
                 error_message = (
-                    "The AI Analyst could not complete this request. "
-                    "Please try again with a more focused question."
+                    "The AI Analyst could not complete "
+                    "the request."
                 )
 
                 st.error(error_message)
@@ -795,7 +714,7 @@ def render_ai_analyst():
                     }
                 )
 
-
+                st.exception(error)
 def main():
     page = render_sidebar()
 
